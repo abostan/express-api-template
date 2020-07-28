@@ -564,3 +564,98 @@ And that’s it. From now on we can add as many environment variables as we want
 This is a good point to commit your code. Remember to prettify and lint your code.
 
 - _The corresponding branch on my repo is [03-env-variables](https://github.com/chidimo/Express-API-Template/tree/03-env-variables)._
+
+# Writing Our First Test
+
+It’s time to incorporate testing into our app. One of the things that give the developer confidence in their code is tests. I’m sure you’ve seen countless articles on the web preaching Test-Driven Development (TDD). It cannot be emphasized enough that your code needs some measure of testing. TDD is very easy to follow when you’re working with Express.js.
+
+In our tests, we will make calls to our API endpoints and check to see if what is returned is what we expect.
+
+Install the required dependencies:
+
+```sh
+# install dependencies
+yarn add mocha chai nyc sinon-chai supertest coveralls --dev
+```
+
+Each of these libraries has its own role to play in our tests.
+
+| Libraries  | Description                                  |
+| ---------- | -------------------------------------------- |
+| mocha      | test runner                                  |
+| chai       | used to make assertions                      |
+| nyc        | collect test coverage report                 |
+| sinon-chai | extends chai’s assertions                    |
+| supertest  | used to make HTTP calls to our API endpoints |
+| coveralls  | for uploading test coverage to coveralls.io  |
+
+Create a new `test/` folder at the root of your project. Create two files inside this folder:
+
+- _test/setup.js_
+- _test/index.test.js_
+
+Mocha will find the `test/` folder automatically.
+
+Open up _test/setup.js_ and paste the below code. This is just a helper file that helps us organize all the imports we need in our test files.
+
+```js
+import supertest from 'supertest';
+import chai from 'chai';
+import sinonChai from 'sinon-chai';
+import app from '../src/app';
+
+chai.use(sinonChai);
+export const { expect } = chai;
+export const server = supertest.agent(app);
+export const BASE_URL = '/v1';
+```
+
+This is like a settings file, but for our tests. This way we don’t have to initialize everything inside each of our test files. So we import the necessary packages and export what we initialized — which we can then import in the files that need them.
+
+Open up index.test.js and paste the following test code.
+
+```js
+import { expect, server, BASE_URL } from './setup';
+
+describe('Index page test', () => {
+  it('gets base url', (done) => {
+    server
+      .get(`${BASE_URL}/`)
+      .expect(200)
+      .end((err, res) => {
+        expect(res.status).to.equal(200);
+        expect(res.body.message).to.equal(
+          'Environment variable is coming across.'
+        );
+        done();
+      });
+  });
+});
+```
+
+Here we make a request to get the base endpoint, which is `/` and assert that the `res.body` object has a `message` key with a value of `Environment variable is coming across`.
+
+If you’re not familiar with the `describe`, `it` pattern, I encourage you to take a quick look at Mocha’s “[Getting Started](https://mochajs.org/#getting-started)” doc.
+
+Add the test command to the `scripts` section of package.json.
+
+```json
+"test": "nyc --reporter=html --reporter=text --reporter=lcov mocha -r @babel/register"
+```
+
+This script executes our test with `nyc` and generates three kinds of coverage report: an HTML report, outputted to the `coverage/` folder; a text report outputted to the terminal and an lcov report outputted to the `.nyc_output/` folder.
+
+Now run `yarn test`. You should see a text report in your terminal just like the one in the below photo.
+
+![Tests](https://cloud.netlifyusercontent.com/assets/344dbf88-fdf9-42bb-adb4-46f01eedd629/c0a8035c-d7ad-4b6b-acb9-474495a5c84d/01-first-test-report.png)
+
+Notice that two additional folders are generated:
+
+- `.nyc_output/`
+- `coverage/`
+
+Look inside `.gitignore` and you’ll see that we’re already ignoring both. I encourage you to open up `coverage/index.html` in a browser and view the test report for each file.
+
+This is a good point to commit your changes.
+
+- _The corresponding branch in my repo is [04-first-test](https://github.com/chidimo/Express-API-Template/tree/04-first-test)._
