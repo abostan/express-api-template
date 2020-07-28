@@ -681,18 +681,17 @@ Travis CI is a tool that runs our tests automatically each time we push a commit
 9. On the project page, click on `More options` > `Settings`. Under `Environment Variables` section, add the `TEST_ENV_VARIABLE` env variable. When entering its value, be sure to have it within double quotes like this `"Environment variable is coming across"`.
 10. Create .travis.yml file at the root of your project and paste in the below code (We’ll set the value of `CC_TEST_REPORTER_ID` in the [Code Climate section](#code-climate)).
 
-```sh
+```yml
 language: node_js
 env:
   global:
     - CC_TEST_REPORTER_ID=get-this-from-code-climate-repo-page
 matrix:
   include:
-  - node_js: '12'
+    - node_js: '12'
 cache:
   directories: [node_modules]
-install:
-  yarn
+install: yarn
 after_success: yarn coverage
 before_script:
   - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
@@ -761,10 +760,10 @@ AppVeyor and Travis CI are both automated test runners. The main difference is t
 - Click on the `Settings` tab. Click on `Environment` on the left navigation. Add `TEST_ENV_VARIABLE` and its value. Click ‘Save’ at the bottom of the page.
 - Create the _appveyor.yml_ file at the root of your project and paste in the below code.
 
-```sh
+```yml
 environment:
   matrix:
-  - nodejs_version: "12"
+    - nodejs_version: '12'
 install:
   - yarn
 test_script:
@@ -786,11 +785,11 @@ Now is a good time to commit our changes.
 
 # Adding A Controller
 
-Currently, we’re handling the `GET` request to the root URL, `/v1`, inside the *src/routes/index.js*. This works as expected and there is nothing wrong with it. However, as your application grows, you want to keep things tidy. You want concerns to be separated — you want a clear separation between the code that handles the request and the code that generates the response that will be sent back to the client. To achieve this, we write `controllers`. Controllers are simply functions that handle requests coming through a particular URL.
+Currently, we’re handling the `GET` request to the root URL, `/v1`, inside the _src/routes/index.js_. This works as expected and there is nothing wrong with it. However, as your application grows, you want to keep things tidy. You want concerns to be separated — you want a clear separation between the code that handles the request and the code that generates the response that will be sent back to the client. To achieve this, we write `controllers`. Controllers are simply functions that handle requests coming through a particular URL.
 
-To get started, create a `controllers/` folder inside the `src/` folder. Inside `controllers` create two files: *index.js* and *home.js*. We would export our functions from within *index.js*. You could name *home.js* anything you want, but typically you want to name controllers after what they control. For example, you might have a file *usersController.js* to hold every function related to users in your app.
+To get started, create a `controllers/` folder inside the `src/` folder. Inside `controllers` create two files: _index.js_ and _home.js_. We would export our functions from within _index.js_. You could name _home.js_ anything you want, but typically you want to name controllers after what they control. For example, you might have a file _usersController.js_ to hold every function related to users in your app.
 
-Open *src/controllers/home.js* and enter the code below:
+Open _src/controllers/home.js_ and enter the code below:
 
 ```js
 import { testEnvironmentVariable } from '../settings';
@@ -801,14 +800,17 @@ export const indexPage = (req, res) =>
 
 You will notice that we only moved the function that handles the request for the `/` route.
 
-Open *src/controllers/index.js* and enter the below code.
+Open _src/controllers/index.js_ and enter the below code.
+
 ```js
 // export everything from home.js
 export * from './home';
 ```
+
 We export everything from the home.js file. This allows us shorten our `import statements to import { indexPage } from '../controllers';`
 
-Open *src/routes/index.js* and replace the code there with the one below:
+Open _src/routes/index.js_ and replace the code there with the one below:
+
 ```js
 import express from 'express';
 import { indexPage } from '../controllers';
@@ -818,6 +820,7 @@ indexRouter.get('/', indexPage);
 
 export default indexRouter;
 ```
+
 The only change here is that we’ve provided a function to handle the request to the `/` route.
 
 You just successfully wrote your first controller. From here it’s a matter of adding more files and functions as needed.
@@ -828,4 +831,407 @@ Run `yarn test` to confirm that we’ve not broken anything. Does your test pass
 
 This is a good point to commit our changes.
 
-*The corresponding branch in my repo is [06-controllers](https://github.com/chidimo/Express-API-Template/tree/06-controllers).*
+_The corresponding branch in my repo is [06-controllers](https://github.com/chidimo/Express-API-Template/tree/06-controllers)._
+
+# Connecting The PostgreSQL Database And Writing A Model
+
+Our controller currently returns hard-coded text messages. In a real-world app, we often need to store and retrieve information from a database. In this section, we will connect our app to a PostgreSQL database.
+
+We’re going to implement the storage and retrieval of simple text messages using a database. We have two options for setting a database: we could provision one from a cloud server, or we could set up our own locally.
+
+I would recommend you provision a database from a cloud server. [ElephantSQL](https://www.elephantsql.com/) has a free plan that gives 20MB of free storage which is sufficient for this tutorial. Visit the site and click on `Get a managed database today`. Create an account (if you don’t have one) and follow the instructions to create a free plan. Take note of the URL on the database details page. We’ll be needing it soon.
+
+![ElephantSQL turtle plan details page](https://res.cloudinary.com/indysigner/image/fetch/f_auto,q_auto/w_2000/https://cloud.netlifyusercontent.com/assets/344dbf88-fdf9-42bb-adb4-46f01eedd629/7eacbd2b-e090-43f6-96dc-f6ab7763b2b8/03-express-api-backend-project-with-postgresql.png)
+
+If you would rather set up a database locally, you should visit the [PostgreSQL](https://www.postgresql.org/) and [PgAdmin](https://www.pgadmin.org/) sites for further instructions.
+
+Once we have a database set up, we need to find a way to allow our Express app to communicate with our database. Node.js by default doesn’t support reading and writing to `PostgreSQL` database, so we’ll be using an excellent library, appropriately named, [node-postgres](https://node-postgres.com/).
+
+`node-postgres` executes SQL queries in node and returns the result as an object, from which we can grab items from the rows key.
+
+Let’s connect `node-postgres` to our application.
+
+```sh
+# install node-postgres
+yarn add pg
+```
+
+Open _settings.js_ and add the line below:
+
+```js
+export const connectionString = process.env.CONNECTION_STRING;
+```
+
+Open your `.env` file and add the `CONNECTION_STRING` variable. This is the connection string we’ll be using to establish a connection to our database. The general form of the connection string is shown below.
+
+```js
+CONNECTION_STRING = 'postgresql://dbuser:dbpassword@localhost:5432/dbname';
+```
+
+If you’re using elephantSQL you should copy the URL from the database details page.
+
+Inside your `/src` folder, create a new folder called `models/`. Inside this folder, create two files:
+
+- _pool.js_
+- _model.js_
+
+Open _pools.js_ and paste the following code:
+
+```js
+import { Pool } from 'pg';
+import dotenv from 'dotenv';
+import { connectionString } from '../settings';
+dotenv.config();
+
+export const pool = new Pool({ connectionString });
+```
+
+First, we import the `Pool` and `dotenv` from the `pg` and `dotenv` packages, and then import the settings we created for our postgres database before initializing `dotenv`. We establish a connection to our database with the `Pool` object. In `node-postgres`, every query is executed by a client. A Pool is a collection of clients for communicating with the database.
+
+To create the connection, the pool constructor takes a config object. You can read more about all the possible configurations [here](https://node-postgres.com/api/pool). It also accepts a single connection string, which I will use here.
+
+Open _model.js_ and paste the following code:
+
+```js
+import { pool } from './pool';
+
+class Model {
+  constructor(table) {
+    this.pool = pool;
+    this.table = table;
+    this.pool.on(
+      'error',
+      (err, client) => `Error, ${err}, on idle client${client}`
+    );
+  }
+
+  async select(columns, clause) {
+    let query = `SELECT ${columns} FROM ${this.table}`;
+    if (clause) query += clause;
+    return this.pool.query(query);
+  }
+}
+
+export default Model;
+```
+
+We create a model class whose constructor accepts the database table we wish to operate on. We’ll be using a single pool for all our models.
+
+We then create a `select` method which we will use to retrieve items from our database. This method accepts the columns we want to retrieve and a clause, such as a `WHERE` clause. It returns the result of the query, which is a `Promise`. Remember we said earlier that every query is executed by a client, but here we execute the query with pool. This is because, when we use `pool.query`, `node-postgres` executes the query using the first available idle client.
+
+The query you write is entirely up to you, provided it is a valid `SQL` statement that can be executed by a Postgres engine.
+
+The next step is to actually create an API endpoint to utilize our newly connected database. Before we do that, I’d like us to create some utility functions. The goal is for us to have a way to perform common database operations from the command line.
+
+Create a folder, `utils/` inside the `src/` folder. Create three files inside this folder:
+
+- _queries.js_
+- _queryFunctions.js_
+- _runQuery.js_
+
+We’re going to create functions to create a table in our database, insert seed data in the table, and to delete the table.
+
+Open up _queries.js_ and paste the following code:
+
+```js
+export const createMessageTable = `
+DROP TABLE IF EXISTS messages;
+CREATE TABLE IF NOT EXISTS messages (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR DEFAULT '',
+  message VARCHAR NOT NULL
+  )
+  `;
+
+export const insertMessages = `
+INSERT INTO messages(name, message)
+VALUES ('chidimo', 'first message'),
+      ('orji', 'second message')
+`;
+
+export const dropMessagesTable = 'DROP TABLE messages';
+```
+
+In this file, we define three SQL query strings. The first query deletes and recreates the `messages` table. The second query inserts two rows into the `messages` table. Feel free to add more items here. The last query drops/deletes the `messages` table.
+
+Open _queryFunctions.js_ and paste the following code:
+
+```js
+import { pool } from '../models/pool';
+import {
+  insertMessages,
+  dropMessagesTable,
+  createMessageTable,
+} from './queries';
+
+export const executeQueryArray = async (arr) =>
+  new Promise((resolve) => {
+    const stop = arr.length;
+    arr.forEach(async (q, index) => {
+      await pool.query(q);
+      if (index + 1 === stop) resolve();
+    });
+  });
+
+export const dropTables = () => executeQueryArray([dropMessagesTable]);
+export const createTables = () => executeQueryArray([createMessageTable]);
+export const insertIntoTables = () => executeQueryArray([insertMessages]);
+```
+
+Here, we create functions to execute the queries we defined earlier. Note that the `executeQueryArray` function executes an array of queries and waits for each one to complete inside the loop. (Don’t do such a thing in production code though). Then, we only resolve the promise once we have executed the last query in the list. The reason for using an array is that the number of such queries will grow as the number of tables in our database grows.
+
+Open _runQuery.js_ and paste the following code:
+
+```js
+import { createTables, insertIntoTables } from './queryFunctions';
+
+(async () => {
+  await createTables();
+  await insertIntoTables();
+})();
+```
+
+This is where we execute the functions to create the table and insert the messages in the table. Let’s add a command in the `scripts` section of our _package.json_ to execute this file.
+
+```json
+"runQuery": "babel-node ./src/utils/runQuery"
+```
+
+Now run:
+
+```sh
+yarn runQuery
+```
+
+If you inspect your database, you will see that the `messages` table has been created and that the messages were inserted into the table.
+
+If you’re using ElephantSQL, on the database details page, click on `BROWSER` from the left navigation menu. Select the `messages` table and click `Execute`. You should see the messages from the _queries.js_ file.
+
+Let’s create a controller and route to display the messages from our database.
+
+Create a new controller file _src/controllers/messages.js_ and paste the following code:
+
+```js
+import Model from '../models/model';
+
+const messagesModel = new Model('messages');
+export const messagesPage = async (req, res) => {
+  try {
+    const data = await messagesModel.select('name, message');
+    res.status(200).json({ messages: data.rows });
+  } catch (err) {
+    res.status(200).json({ messages: err.stack });
+  }
+};
+```
+
+We import our `Model` class and create a new instance of that model. This represents the `messages` table in our database. We then use the `select` method of the model to query our database. The data (`name` and `message`) we get is sent as JSON in the response.
+
+We define the `messagesPage` controller as an `async` function. Since `node-postgres` queries return a promise, we `await` the result of that query. If we encounter an error during the query we catch it and display the stack to the user. You should decide how choose to handle the error.
+
+Add the get messages endpoint to _src/routes/index.js_ and update the import line.
+
+```js
+# update the import line
+import { indexPage, messagesPage } from '../controllers';
+
+# add the get messages endpoint
+indexRouter.get('/messages', messagesPage)
+```
+
+Visit [http://localhost:3000/v1/messages](http://localhost:3000/v1/messages) and you should see the messages displayed as shown below.
+
+![Messages from database](https://res.cloudinary.com/indysigner/image/fetch/f_auto,q_auto/w_2000/https://cloud.netlifyusercontent.com/assets/344dbf88-fdf9-42bb-adb4-46f01eedd629/61480f23-8930-4e4f-affd-ee1548760c39/04-express-api-backend-project-with-postgresql.png)
+
+Now, let’s update our test file. When doing TDD, you usually write your tests before implementing the code that makes the test pass. I’m taking the opposite approach here because we’re still working on setting up the database.
+
+Create a new file, hooks.js in the `test/` folder and enter the below code:
+
+```js
+import {
+  dropTables,
+  createTables,
+  insertIntoTables,
+} from '../src/utils/queryFunctions';
+
+before(async () => {
+  await createTables();
+  await insertIntoTables();
+});
+
+after(async () => {
+  await dropTables();
+});
+```
+
+When our test starts, Mocha finds this file and executes it before running any test file. It executes the `before` hook to create the database and insert some items into it. The test files then run after that. Once the test is finished, Mocha runs the `after` hook in which we drop the database. This ensures that each time we run our tests, we do so with clean and new records in our database.
+
+Create a new test file _test/messages.test.js_ and add the below code:
+
+```js
+import { expect, server, BASE_URL } from './setup';
+describe('Messages', () => {
+  it('get messages page', (done) => {
+    server
+      .get(`${BASE_URL}/messages`)
+      .expect(200)
+      .end((err, res) => {
+        expect(res.status).to.equal(200);
+        expect(res.body.messages).to.be.instanceOf(Array);
+        res.body.messages.forEach((m) => {
+          expect(m).to.have.property('name');
+          expect(m).to.have.property('message');
+        });
+        done();
+      });
+  });
+});
+```
+
+We assert that the result of the call to `/messages` is an array. For each message object, we assert that it has the `name` and `message` property.
+
+The final step in this section is to update the CI files.
+
+Add the following sections to the _.travis.yml_ file:
+
+```yml
+services:
+  - postgresql
+addons:
+  postgresql: '10'
+  apt:
+    packages:
+      - postgresql-10
+      - postgresql-client-10
+before_install:
+  - sudo cp /etc/postgresql/{9.6,10}/main/pg_hba.conf
+  - sudo /etc/init.d/postgresql restart
+```
+
+This instructs Travis to spin up a PostgreSQL 10 database before running our tests.
+
+Add the command to create the database as the first entry in the `before_script` section:
+
+```sh
+# add this as the first line in the before_script section
+- psql -c 'create database testdb;' -U postgres
+```
+
+Create the `CONNECTION_STRING` environment variable on Travis, and use the below value:
+
+```sh
+CONNECTION_STRING="postgresql://postgres:postgres@localhost:5432/testdb"
+```
+
+Add the following sections to the _.appveyor.yml_ file:
+
+```yml
+before_test:
+  - SET PGUSER=postgres
+  - SET PGPASSWORD=Password12!
+  - PATH=C:\Program Files\PostgreSQL\10\bin\;%PATH%
+  - createdb testdb
+services:
+  - postgresql101
+```
+
+Add the connection string environment variable to appveyor. Use the below line:
+
+```sh
+CONNECTION_STRING=postgresql://postgres:Password12!@localhost:5432/testdb
+```
+
+Now commit your changes and push to GitHub. Your tests should pass on both Travis CI and AppVeyor.
+
+- The corresponding branch in my repo is [07-connect-postgres](https://github.com/chidimo/Express-API-Template/tree/07-connect-postgres).
+
+> Note: I hope everything works fine on your end, but in case you should be having trouble for some reason, you can always check my code in the repo!
+
+Now, let’s see how we can add a message to our database. For this step, we’ll need a way to send `POST` requests to our URL. I’ll be using [Postman](https://www.postman.com/) to send `POST` requests.
+
+Let’s go the TDD route and update our test to reflect what we expect to achieve.
+
+Open _test/message.test.js_ and add the below test case:
+
+```js
+it('posts messages', (done) => {
+  const data = { name: 'some name', message: 'new message' };
+  server
+    .post(`${BASE_URL}/messages`)
+    .send(data)
+    .expect(200)
+    .end((err, res) => {
+      expect(res.status).to.equal(200);
+      expect(res.body.messages).to.be.instanceOf(Array);
+      res.body.messages.forEach((m) => {
+        expect(m).to.have.property('id');
+        expect(m).to.have.property('name', data.name);
+        expect(m).to.have.property('message', data.message);
+      });
+      done();
+    });
+});
+```
+
+This test makes a POST request to the `/v1/messages` endpoint and we expect an array to be returned. We also check for the `id`, `name`, and `message` properties on the array.
+
+Run your tests to see that this case fails. Let’s now fix it.
+
+To send post requests, we use the post method of the server. We also send the name and message we want to insert. We expect the response to be an array, with a property `id` and the other info that makes up the query. The `id` is proof that a record has been inserted into the database.
+
+Open _src/models/model.js_ and add the `insert` method:
+
+```js
+async insertWithReturn(columns, values) {
+  const query = `
+        INSERT INTO ${this.table}(${columns})
+        VALUES (${values})
+        RETURNING id, ${columns}
+    `;
+  return this.pool.query(query);
+}
+```
+
+This is the method that allows us to insert messages into the database. After inserting the item, it returns the `id`, `name` and `message`.
+
+Open _src/controllers/messages.js_ and add the below controller:
+
+```js
+export const addMessage = async (req, res) => {
+  const { name, message } = req.body;
+  const columns = 'name, message';
+  const values = `'${name}', '${message}'`;
+  try {
+    const data = await messagesModel.insertWithReturn(columns, values);
+    res.status(200).json({ messages: data.rows });
+  } catch (err) {
+    res.status(200).json({ messages: err.stack });
+  }
+};
+```
+
+We destructure the request body to get the name and message. Then we use the values to form an SQL query string which we then execute with the `insertWithReturn` method of our model.
+
+Add the below `POST` endpoint to _/src/routes/index.js_ and update your import line.
+
+```js
+import { indexPage, messagesPage, addMessage } from '../controllers';
+
+indexRouter.post('/messages', addMessage);
+```
+
+Run your tests to see if they pass.
+
+Open Postman and send a `POST` request to the `messages` endpoint. If you’ve just run your test, remember to run `yarn query` to recreate the `messages` table.
+
+```sh
+yarn query
+```
+
+![POST request to messages endpoint](https://res.cloudinary.com/indysigner/image/fetch/f_auto,q_auto/w_2000/https://cloud.netlifyusercontent.com/assets/344dbf88-fdf9-42bb-adb4-46f01eedd629/d69d2e52-8a94-4fa1-a883-772c6c1ab2c9/05-express-api-backend-project-with-postgresql.png)
+
+![GET request showing newly added message](https://res.cloudinary.com/indysigner/image/fetch/f_auto,q_auto/w_2000/https://cloud.netlifyusercontent.com/assets/344dbf88-fdf9-42bb-adb4-46f01eedd629/dd02979f-dbd0-490d-82cf-c7a7369f91e6/06-express-api-backend-project-with-postgresql.png)
+
+Commit your changes and push to GitHub. Your tests should pass on both Travis and AppVeyor. Your test coverage will drop by a few points, but that’s okay.
+
+- _The corresponding branch on my repo is [08-post-to-db](https://github.com/chidimo/Express-API-Template/tree/08-post-to-db)_.
