@@ -783,3 +783,49 @@ Commit your code and push to GitHub. If you have done everything as instructed a
 Now is a good time to commit our changes.
 
 - _The corresponding branch in my repo is [05-ci](https://github.com/chidimo/Express-API-Template/tree/05-ci)._
+
+# Adding A Controller
+
+Currently, we’re handling the `GET` request to the root URL, `/v1`, inside the *src/routes/index.js*. This works as expected and there is nothing wrong with it. However, as your application grows, you want to keep things tidy. You want concerns to be separated — you want a clear separation between the code that handles the request and the code that generates the response that will be sent back to the client. To achieve this, we write `controllers`. Controllers are simply functions that handle requests coming through a particular URL.
+
+To get started, create a `controllers/` folder inside the `src/` folder. Inside `controllers` create two files: *index.js* and *home.js*. We would export our functions from within *index.js*. You could name *home.js* anything you want, but typically you want to name controllers after what they control. For example, you might have a file *usersController.js* to hold every function related to users in your app.
+
+Open *src/controllers/home.js* and enter the code below:
+
+```js
+import { testEnvironmentVariable } from '../settings';
+
+export const indexPage = (req, res) =>
+  res.status(200).json({ message: testEnvironmentVariable });
+```
+
+You will notice that we only moved the function that handles the request for the `/` route.
+
+Open *src/controllers/index.js* and enter the below code.
+```js
+// export everything from home.js
+export * from './home';
+```
+We export everything from the home.js file. This allows us shorten our `import statements to import { indexPage } from '../controllers';`
+
+Open *src/routes/index.js* and replace the code there with the one below:
+```js
+import express from 'express';
+import { indexPage } from '../controllers';
+const indexRouter = express.Router();
+
+indexRouter.get('/', indexPage);
+
+export default indexRouter;
+```
+The only change here is that we’ve provided a function to handle the request to the `/` route.
+
+You just successfully wrote your first controller. From here it’s a matter of adding more files and functions as needed.
+
+Go ahead and play with the app by adding a few more routes and controllers. You could add a route and a controller for the about page. Remember to update your test, though.
+
+Run `yarn test` to confirm that we’ve not broken anything. Does your test pass? That’s cool.
+
+This is a good point to commit our changes.
+
+*The corresponding branch in my repo is [06-controllers](https://github.com/chidimo/Express-API-Template/tree/06-controllers).*
