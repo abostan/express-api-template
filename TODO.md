@@ -647,7 +647,7 @@ This script executes our test with `nyc` and generates three kinds of coverage r
 
 Now run `yarn test`. You should see a text report in your terminal just like the one in the below photo.
 
-![Tests](https://cloud.netlifyusercontent.com/assets/344dbf88-fdf9-42bb-adb4-46f01eedd629/c0a8035c-d7ad-4b6b-acb9-474495a5c84d/01-first-test-report.png)
+![Test coverage report](https://res.cloudinary.com/indysigner/image/fetch/f_auto,q_auto/w_1200/https://cloud.netlifyusercontent.com/assets/344dbf88-fdf9-42bb-adb4-46f01eedd629/c0a8035c-d7ad-4b6b-acb9-474495a5c84d/01-first-test-report.png)
 
 Notice that two additional folders are generated:
 
@@ -659,3 +659,127 @@ Look inside `.gitignore` and you’ll see that we’re already ignoring both. I 
 This is a good point to commit your changes.
 
 - _The corresponding branch in my repo is [04-first-test](https://github.com/chidimo/Express-API-Template/tree/04-first-test)._
+
+# Continuous Integration(CD) And Badges: Travis, Coveralls, Code Climate, AppVeyor
+
+It’s now time to configure continuous integration and deployment (CI/CD) tools. We will configure common services such as `travis-ci`, `coveralls`, `AppVeyor`, and `codeclimate` and add badges to our README file.
+
+Let’s get started.
+
+### TRAVIS CI
+
+Travis CI is a tool that runs our tests automatically each time we push a commit to GitHub (and recently, Bitbucket) and each time we create a pull request. This is mostly useful when making pull requests by showing us if the our new code has broken any of our tests.
+
+1. Visit [travis-ci.com](https://travis-ci.com/) or [travis-ci.org](https://travis-ci.org/) and create an account if you don’t have one. You have to sign up with your GitHub account.
+2. Hover over the dropdown arrow next to your profile picture and click on settings.
+3. Under `Repositories` tab click `Manage repositories on Github` to be redirected to Github.
+4. On the GitHub page, scroll down to `Repository access` and click the checkbox next to `Only select repositories`.
+5. Click the `Select repositories` dropdown and find the `express-api-template` repo. Click it to add it to the list of repositories you want to add to `travis-ci`.
+6. Click `Approve and install` and wait to be redirected back to `travis-ci`.
+7. At the top of the repo page, close to the repo name, click on the `build unknown` icon. From the Status Image modal, select markdown from the format dropdown.
+8. Copy the resulting code and paste it in your _README.md_ file.
+9. On the project page, click on `More options` > `Settings`. Under `Environment Variables` section, add the `TEST_ENV_VARIABLE` env variable. When entering its value, be sure to have it within double quotes like this `"Environment variable is coming across"`.
+10. Create .travis.yml file at the root of your project and paste in the below code (We’ll set the value of `CC_TEST_REPORTER_ID` in the [Code Climate section](#code-climate)).
+
+```sh
+language: node_js
+env:
+  global:
+    - CC_TEST_REPORTER_ID=get-this-from-code-climate-repo-page
+matrix:
+  include:
+  - node_js: '12'
+cache:
+  directories: [node_modules]
+install:
+  yarn
+after_success: yarn coverage
+before_script:
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+  - chmod +x ./cc-test-reporter
+  - ./cc-test-reporter before-build
+script:
+  - yarn test
+after_script:
+  - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESUL
+```
+
+First, we tell Travis to run our test with Node.js, then set the `CC_TEST_REPORTER_ID` global environment variable (we’ll get to this in the [Code Climate section](#code-climate)). In the `matrix` section, we tell Travis to run our tests with Node.js v12. We also want to cache the `node_modules/` directory so it doesn’t have to be regenerated every time.
+
+We install our dependencies using the `yarn` command which is a shorthand for `yarn install`. The `before_script` and `after_script` commands are used to upload coverage results to `codeclimate`. We’ll configure codeclimate shortly. After `yarn test` runs successfully, we want to also run `yarn coverage` which will upload our coverage report to [coveralls.io](https://coveralls.io/).
+
+### COVERALLS
+
+Coveralls uploads test coverage data for easy visualization. We can view the test coverage on our local machine from the coverage folder, but Coveralls makes it available outside our local machine.
+
+1. Visit [coveralls.io](https://coveralls.io/) and either sign in or sign up with your Github account.
+2. Hover over the left-hand side of the screen to reveal the navigation menu. Click on `ADD REPOS`.
+3. Search for the `express-api-template` repo and turn on coverage using the toggle button on the left-hand side. If you can’t find it, click on `SYNC REPOS` on the upper right-hand corner and try again. Note that your repo has to be public, unless you have a PRO account.
+4. Click details to go to the repo details page.
+5. Create the _.coveralls.yml_ file at the root of your project and enter the below code. To get the `repo_token`, click on the repo details. You will find it easily on that page. You could just do a browser search for `repo_token`.
+
+```sh
+repo_token: get-this-from-repo-settings-on-coveralls.io
+```
+
+This token maps your coverage data to a repo on Coveralls. Now, add the `coverage` command to the `scripts` section of your _package.json_ file:
+
+```json
+"coverage": "nyc report --reporter=text-lcov | coveralls"
+```
+
+This command uploads the coverage report in the `.nyc_output` folder to [coveralls.io](https://coveralls.io/). Turn on your Internet connection and run:
+
+```sh
+yarn coverage
+```
+
+This should upload the existing coverage report to coveralls. Refresh the repo page on coveralls to see the full report.
+
+On the details page, scroll down to find the `BADGE YOUR REPO` section. Click on the `EMBED` dropdown and copy the markdown code and paste it into your _README_ file.
+
+### Code Climate
+
+Code Climate is a tool that helps us measure code quality. It shows us maintenance metrics by checking our code against some defined patterns. It detects things such as unnecessary repetition and deeply nested for loops. It also collects test coverage data just like coveralls.io.
+
+1. Visit [codeclimate.com](https://codeclimate.com/login/github/join?return_to=%2Foss%2Fdashboard) and click on ‘Sign up with GitHub’. Log in if you already have an account.
+2. Once in your dashboard, click on `Add a repository`.
+3. Find the `express-api-template` repo from the list and click on `Add Repo`.
+4. Wait for the build to complete and redirect to the repo dashboard.
+5. Under `Codebase Summary`, click on `Test Coverage`. Under the `Test coverage` menu, copy the `TEST REPORTER ID` and paste it in your .travis.yml as the value of `CC_TEST_REPORTER_ID`.
+6. Still on the same page, on the left-hand navigation, under `EXTRAS`, click on Badges. Copy the `maintainability` and `test coverage` badges in markdown format and paste them into your _README.md_ file.
+
+It’s important to note that there are two ways of configuring maintainability checks. There are the default settings that are applied to every repo, but if you like, you could provide a _.codeclimate.yml_ file at the root of your project. I’ll be using the default settings, which you can find under the `Maintainability` tab of the repo settings page. I encourage you to take a look at least. If you still want to configure your own settings, this [guide](https://docs.codeclimate.com/docs/advanced-configuration) will give you all the information you need.
+
+### APPVEYOR
+
+AppVeyor and Travis CI are both automated test runners. The main difference is that travis-ci runs tests in a Linux environment while AppVeyor runs tests in a Windows environment. This section is included to show how to get started with AppVeyor.
+
+- Visit [AppVeyor](https://ci.appveyor.com/) and log in or sign up.
+- On the next page, click on `NEW PROJECT`.
+- From the repo list, find the `express-api-template` repo. Hover over it and click `ADD`.
+- Click on the `Settings` tab. Click on `Environment` on the left navigation. Add `TEST_ENV_VARIABLE` and its value. Click ‘Save’ at the bottom of the page.
+- Create the _appveyor.yml_ file at the root of your project and paste in the below code.
+
+```sh
+environment:
+  matrix:
+  - nodejs_version: "12"
+install:
+  - yarn
+test_script:
+  - yarn test
+build: off
+```
+
+This code instructs AppVeyor to run our tests using Node.js v12. We then install our project dependencies with the `yarn` command. `test_script` specifies the command to run our test. The last line tells AppVeyor not to create a build folder.
+
+Click on the `Settings` tab. On the left-hand navigation, click on badges. Copy the markdown code and paste it in your _README.md_ file.
+
+Commit your code and push to GitHub. If you have done everything as instructed all tests should pass and you should see your shiny new badges as shown below. Check again that you have set the environment variables on Travis and AppVeyor.
+
+![Repo CI/CD badges](https://res.cloudinary.com/indysigner/image/fetch/f_auto,q_auto/w_1200/https://cloud.netlifyusercontent.com/assets/344dbf88-fdf9-42bb-adb4-46f01eedd629/4daf736a-f918-48a9-af01-04a785aedab7/02-express-api-backend-project-with-postgresql.png)
+
+Now is a good time to commit our changes.
+
+- _The corresponding branch in my repo is [05-ci](https://github.com/chidimo/Express-API-Template/tree/05-ci)._
